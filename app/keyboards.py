@@ -242,7 +242,8 @@ def home_page():
             [InlineKeyboardButton(text="Редактировать профиль ✏️", callback_data='my_profile')], #+
             [InlineKeyboardButton(text="Наши отзывы 📝", callback_data='feedback')],
             [InlineKeyboardButton(text="Каталог подписок 🛒", callback_data='by_subscriptions')],
-            [InlineKeyboardButton(text="🚀 ЗАПУСТИТЬ НЕЙРОКОММЕНТИНГ 🚀", callback_data='launch_bot')]
+            [InlineKeyboardButton(text="🚀 Запустить нейрокомментинг 🚀", callback_data='launch_bot')],
+            [InlineKeyboardButton(text="🆘 Связаться с поддержкой", url='https://t.me/Alexcharevich')]
     ])
     return home_page
 
