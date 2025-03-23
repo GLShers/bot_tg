@@ -77,9 +77,15 @@ def start():
 
 def style():
     style = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text='Стиль Сета Година', callback_data='go_style')],
-         [InlineKeyboardButton(text='Стиль Гая Кавасаки', callback_data='go_style')],
-         [InlineKeyboardButton(text='Стиль Илона Маска', callback_data='go_style')]])
+        [InlineKeyboardButton(text='💼 Деловой', callback_data='go_style')],
+        [InlineKeyboardButton(text='💡 Инновационный', callback_data='go_style')],
+        [InlineKeyboardButton(text='🚀 Динамичный', callback_data='go_style')],
+        [InlineKeyboardButton(text='🎭 Дружелюбный', callback_data='go_style')],
+        [InlineKeyboardButton(text='📊 Аналитический', callback_data='go_style')],
+        [InlineKeyboardButton(text='🔍 Экспертный', callback_data='go_style')],
+        [InlineKeyboardButton(text='🌟 Вдохновляющий', callback_data='go_style')],
+        [InlineKeyboardButton(text='🏠 Главное меню', callback_data='home_page')]
+    ])
     return style
 
 
