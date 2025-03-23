@@ -127,8 +127,9 @@ def get_subscription_keyboard():
 
 def feedback():
     feedback = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text='Показать отзывы', callback_data='otziv')],
-        [InlineKeyboardButton(text="Главное меню", callback_data="home_page")]])
+        [InlineKeyboardButton(text='📈 Оставить отзыв', url='https://t.me/Alexcharevich')],
+        [InlineKeyboardButton(text="◀️ Вернуться в главное меню", callback_data="home_page")]
+    ])
     return feedback
 
 
