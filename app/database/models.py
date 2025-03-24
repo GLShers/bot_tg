@@ -37,7 +37,8 @@ class Subscription(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, nullable=False)
     max_chanels: Mapped[int] = mapped_column(Integer, nullable=True)  # Максимальное кол-во каналов
-    date_day: Mapped[int] = mapped_column(Integer, nullable=True)  # Количество дней подписки
+    date_day: Mapped[int] = mapped_column(Integer, nullable=True)
+    sub_name: Mapped[str] = mapped_column(String, nullable=False)  # Название подписки
 
     def __repr__(self):
         return f"<Subscription(id={self.id}, max_chanels={self.max_chanels})>"
