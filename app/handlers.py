@@ -1,5 +1,5 @@
 from aiogram import Bot, F, Router
-from aiogram.types import Message, FSInputFile, CallbackQuery, BotCommand, BotCommandScopeDefault  
+from aiogram.types import Message, FSInputFile, CallbackQuery, BotCommand, BotCommandScopeDefault, InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.filters import Command, StateFilter, CommandStart
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
@@ -68,6 +68,33 @@ async def com_start(message: Message, state: FSMContext):
     await rq.set_user(message.from_user.id)
     await rq.set_login(message.from_user.id, message.from_user.username)
     user = await rq.get_user_data(message.from_user.id)
+    
+    # Проверяем дату подписки, если она существует и не базовая
+    if user.sub_id != 1 and user.date_sub:
+        now = datetime.datetime.now()
+        days_left = (user.date_sub - now).days
+        
+        # Если осталось меньше 3 дней, уведомляем пользователя
+        if 0 <= days_left <= 3:
+            await message.answer(
+                f"<b>⚠️ Внимание! Ваша подписка скоро закончится</b>\n\n"
+                f"До окончания подписки осталось <b>{days_left} {'дней' if days_left > 1 else 'день'}</b>.\n"
+                f"Чтобы продолжить пользоваться всеми функциями бота, "
+                f"рекомендуем продлить подписку заранее.",
+                parse_mode="HTML",
+                reply_markup=kb.subscription_renewal_keyboard()
+            )
+        # Если подписка уже закончилась, уведомляем и сбрасываем на базовую
+        elif days_left < 0:
+            # Сбрасываем на базовую подписку
+            await rq.reset_to_basic_subscription(message.from_user.id)
+            await message.answer(
+                "<b>❌ Ваша подписка закончилась</b>\n\n"
+                "Для продолжения пользования всеми функциями бота, "
+                "пожалуйста, продлите подписку.",
+                parse_mode="HTML",
+                reply_markup=kb.subscription_renewal_keyboard()
+            )
     
     # Проверяем, заполнен ли профиль пользователя полностью
     is_profile_fully_filled = user.link and user.my_chanel_description and user.my_profile_description
@@ -866,17 +893,46 @@ async def compile_bot(callback: CallbackQuery, state: FSMContext):
     
 @router.callback_query(F.data.startswith("all_ready_pay"))
 async def com_start(callback: CallbackQuery):
+    user = await rq.get_user_data(callback.from_user.id)
     sub = await rq.get_sub(callback.from_user.id)
-    if sub.id ==1:
-        await callback.message.answer("У вас пробная подписка. Если вы оплатили, но все еще видете эту надпись, напиши в тех поддержку, сразу же решим", reply_markup=kb.main_button())
+    
+    if user.sub_id == 1:
+        # Подписка еще не подтверждена администратором
+        await callback.message.edit_text(
+            "<b>⚠️ Оплата пока не подтверждена</b>\n\n"
+            "Администратор еще не обработал вашу оплату.\n"
+            "Пожалуйста, подождите некоторое время, или свяжитесь с нами,\n"
+            "если вы уже произвели оплату более 30 минут назад.\n\n"
+            "📩 Поддержка: @Alexcharevich",
+            parse_mode="HTML",
+            reply_markup=kb.main_button()
+        )
         return
+    
+    # Подписка подтверждена (sub_id != 1)
     # Текущая дата
-    current_date = datetime.now()
-    # Дата окончания через 20 дней
+    current_date = datetime.datetime.now()
+    # Дата окончания через количество дней согласно тарифу
     end_date = current_date + timedelta(days=sub.date_day)
    
+    # Устанавливаем дату окончания подписки
     await rq.set_sub_data(callback.from_user.id, end_date)
-    await callback.message.answer("Успешно!", reply_markup= kb.main_button())
+    
+    # Форматируем дату для отображения
+    formatted_date = end_date.strftime("%d.%m.%Y")
+    
+    # Сообщаем пользователю об успешной активации подписки
+    await callback.message.edit_text(
+        f"<b>✅ Подписка успешно активирована!</b>\n\n"
+        f"<b>📊 ИНФОРМАЦИЯ О ВАШЕЙ ПОДПИСКЕ:</b>\n"
+        f"• 💎 Ваш тариф: {sub.sub_name}\n"
+        f"• ⏱️ Действует до: {formatted_date}\n"
+        f"• 📺 Доступно каналов: {sub.max_chanels}\n\n"
+        f"Теперь вы можете использовать все возможности нейрокомментинга!\n"
+        f"Настройте свой профиль и начните привлекать новую аудиторию прямо сейчас.",
+        parse_mode="HTML",
+        reply_markup=kb.home_page()
+    )
     return
     
         
@@ -1176,7 +1232,45 @@ async def com_start(callback: CallbackQuery):
 
 @router.callback_query(F.data.startswith("home_page"))
 async def home_page(callback: CallbackQuery, state: FSMContext):
-    welcome_text = (f"<b>🚀 ЦЕНТР УПРАВЛЕНИЯ НЕЙРОКОММЕНТИНГОМ</b>\n\n"
+    # Получаем данные пользователя
+    user = await rq.get_user_data(callback.from_user.id)
+    
+    # Проверяем статус подписки
+    if user.sub_id != 1:  # Если у пользователя активная подписка (не базовая)
+        # Получаем информацию о подписке
+        subscription = await rq.get_sub(callback.from_user.id)
+        
+        # Получаем список каналов пользователя
+        channels = await rq.get_chanels(callback.from_user.id)
+        channel_count = len(channels) if channels else 0
+        
+        # Получаем количество оставшихся дней подписки
+        days_left = 0
+        if user.date_sub:
+            now = datetime.datetime.now()
+            delta = user.date_sub - now
+            days_left = max(0, delta.days)  # Если отрицательное, значит подписка истекла
+        
+        # Формируем текст для пользователя с подпиской
+        welcome_text = (
+            f"<b>🚀 ЦЕНТР УПРАВЛЕНИЯ НЕЙРОКОММЕНТИНГОМ</b>\n\n"
+            f"<b>👋 Здравствуйте, {callback.from_user.first_name}!</b>\n\n"
+            f"<b>📊 ИНФОРМАЦИЯ О ВАШЕЙ ПОДПИСКЕ:</b>\n"
+            f"• 💎 Текущий план: {subscription.sub_name}\n"
+            f"• ⏱️ Осталось дней: {days_left}\n"
+            f"• 📺 Подключено каналов: {channel_count}/{subscription.max_chanels}\n"
+            f"• 🔄 Свободных слотов: {max(0, subscription.max_chanels - channel_count)}\n\n"
+            f"<b>🔥 ДОСТУПНЫЕ ФУНКЦИИ:</b>\n"
+            f"• ⚙️ Настройка и редактирование профиля\n"
+            f"• 🚀 Запуск/остановка нейрокомментинга\n"
+            f"• 📊 Мониторинг эффективности\n\n"
+            f"<i>Используйте панель управления ниже для доступа ко всем функциям</i>"
+        )
+    else:
+        # Стандартный текст для пользователя без подписки
+        welcome_text = (
+            f"<b>🚀 ЦЕНТР УПРАВЛЕНИЯ НЕЙРОКОММЕНТИНГОМ</b>\n\n"
+            f"<b>👋 Здравствуйте, {callback.from_user.first_name}!</b>\n\n"
             f"<b>📊 МГНОВЕННЫЙ ДОСТУП К ФУНКЦИЯМ:</b>\n"
             f"• ⚙️ Настройка и редактирование профиля\n"
             f"• 📈 Аналитика эффективности комментирования\n"
@@ -1322,26 +1416,12 @@ async def edit_profile_menu(callback: CallbackQuery):
         f"Настройте каждый элемент для максимальной эффективности продвижения. Правильная конфигурация профиля может увеличить приток подписчиков на 200-300%!"
     )
     
-    # Создаем клавиатуру с опциями редактирования
-    keyboard = [
-        [
-            InlineKeyboardButton(text="🔗 Редактировать ссылку на канал", callback_data="edit_link"),
-        ],
-        [
-            InlineKeyboardButton(text="📝 Редактировать описание канала", callback_data="description_chanel"),
-            InlineKeyboardButton(text="👤 Редактировать описание профиля", callback_data="description_profile")
-        ],
-        [
-            InlineKeyboardButton(text="📢 Добавить каналы", callback_data="add_chanels"),
-            InlineKeyboardButton(text="📋 Список каналов", callback_data="list_chanel")
-        ],
-        [
-            InlineKeyboardButton(text="🏠 Вернуться в главное меню", callback_data="home_page")
-        ]
-    ]
-    markup = InlineKeyboardMarkup(inline_keyboard=keyboard)
-    
-    await callback.message.edit_text(profile_text, parse_mode="HTML", reply_markup=markup)
+    # Используем готовую клавиатуру из модуля keyboards
+    await callback.message.edit_text(
+        profile_text,
+        parse_mode="HTML",
+        reply_markup=kb.main_keyboard_2()  # Используем существующую клавиатуру
+    )
 
 # Обработчик кнопки "Редактировать описание канала"
 @router.callback_query(F.data == "description_chanel")
@@ -1557,11 +1637,7 @@ async def handle_launch_bot(callback: CallbackQuery):
             "• Комментарий увидете только вы\n\n"
             "<b>🔥 ФАКТ:</b> Наши клиенты увеличивают активность в каналах на 200-300% благодаря умным комментариям!",
             parse_mode="HTML",
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="🔍 Попробовать тестовый режим", callback_data="test")],
-                [InlineKeyboardButton(text="💎 Приобрести подписку", callback_data="by_subscriptions")],
-                [InlineKeyboardButton(text="🏠 Вернуться в меню", callback_data="home_page")]
-            ])
+            reply_markup=kb.launch_bot_test_keyboard()
         )
     else:
         # Пользователь с подпиской - направляем на полный режим
