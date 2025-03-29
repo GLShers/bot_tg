@@ -1,8 +1,6 @@
 from g4f.client import Client
 import asyncio
 import sys
-
-    
 client = Client()
 response = client.chat.completions.create(
     model="deepseek-v3",
