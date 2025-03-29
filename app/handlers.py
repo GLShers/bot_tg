@@ -1232,104 +1232,7 @@ async def com_start(callback: CallbackQuery):
 
 @router.callback_query(F.data.startswith("home_page"))
 async def home_page(callback: CallbackQuery, state: FSMContext):
-    # Проверяем, настроен ли уже профиль пользователя
-    user = await rq.get_user_data(callback.from_user.id)
-    
-    # Проверяем дату подписки, если она существует и не базовая
-    if user.sub_id != 1 and user.date_sub:
-        now = datetime.datetime.now()
-        days_left = (user.date_sub - now).days
-        
-        # Если осталось меньше 3 дней, уведомляем пользователя
-        if 0 <= days_left <= 3:
-            await callback.message.edit_text(
-                f"<b>⚠️ Внимание! Ваша подписка скоро закончится</b>\n\n"
-                f"До окончания подписки осталось <b>{days_left} {'дней' if days_left > 1 else 'день'}</b>.\n"
-                f"Чтобы продолжить пользоваться всеми функциями бота, "
-                f"рекомендуем продлить подписку заранее.",
-                parse_mode="HTML",
-                reply_markup=kb.subscription_renewal_keyboard()
-            )
-            # Сохраняем ID текущего сообщения и запускаем удаление
-            current_message_id = callback.message.message_id
-            asyncio.create_task(delete_messages_background(
-                callback.bot, 
-                callback.message.chat.id, 
-                current_message_id
-            ))
-        # Если подписка уже закончилась, уведомляем и сбрасываем на базовую
-        elif days_left < 0:
-            # Сбрасываем на базовую подписку
-            await rq.reset_to_basic_subscription(callback.from_user.id)
-            await callback.message.edit_text(
-                "<b>❌ Ваша подписка закончилась</b>\n\n"
-                "Для продолжения пользования всеми функциями бота, "
-                "пожалуйста, продлите подписку.",
-                parse_mode="HTML",
-                reply_markup=kb.subscription_renewal_keyboard()
-            )
-            # Сохраняем ID текущего сообщения и запускаем удаление
-            current_message_id = callback.message.message_id
-            asyncio.create_task(delete_messages_background(
-                callback.bot, 
-                callback.message.chat.id, 
-                current_message_id
-            ))
-    
-    # Проверяем, заполнен ли профиль пользователя полностью
-    is_profile_fully_filled = user.link and user.my_chanel_description and user.my_profile_description
-    
-    if is_profile_fully_filled:
-        # Проверяем статус подписки
-        if user.sub_id != 1:  # Если у пользователя активная подписка (не базовая)
-            # Получаем информацию о подписке
-            subscription = await rq.get_sub(callback.from_user.id)
-            
-            # Получаем список каналов пользователя
-            channels = await rq.get_chanels(callback.from_user.id)
-            channel_count = len(channels) if channels else 0
-            
-            # Получаем количество оставшихся дней подписки
-            days_left = 0
-            if user.date_sub:
-                now = datetime.datetime.now()
-                delta = user.date_sub - now
-                days_left = max(0, delta.days)  # Если отрицательное, значит подписка истекла
-            
-            # Формируем приветственное сообщение с информацией о подписке
-            subscription_text = (
-                f"<b>🚀 ЦЕНТР УПРАВЛЕНИЯ НЕЙРОКОММЕНТИНГОМ</b>\n\n"
-                f"<b>👋 Здравствуйте, {callback.from_user.first_name}!</b>\n\n"
-                f"<b>📊 ИНФОРМАЦИЯ О ВАШЕЙ ПОДПИСКЕ:</b>\n"
-                f"• 💎 Текущий план: {subscription.sub_name}\n"
-                f"• ⏱️ Осталось дней: {days_left}\n"
-                f"• 📺 Подключено каналов: {channel_count}/{subscription.max_chanels}\n"
-                f"• 🔄 Свободных слотов: {max(0, subscription.max_chanels - channel_count)}\n\n"
-                f"<b>🔥 ВАШИ ПРЕИМУЩЕСТВА:</b>\n"
-                f"• 💹 Не нужно покупать телеграмм аккаунты\n"
-                f"• 🧠 Уникальные AI-комментарии вместо шаблонов\n"
-                f"• 🛡️ Встроенная защита от блокировок\n"
-                f"• 📱 Управление через удобный интерфейс\n\n"
-                f"<i>Используйте панель управления ниже для доступа ко всем функциям</i>"
-            )
-            await callback.message.edit_text(
-                subscription_text,
-                parse_mode="HTML",
-                reply_markup=kb.home_page()
-            )
-            # Сохраняем ID текущего сообщения и запускаем удаление
-            current_message_id = callback.message.message_id
-            asyncio.create_task(delete_messages_background(
-                callback.bot, 
-                callback.message.chat.id, 
-                current_message_id
-            ))
-            return
-        
-        # Если нет активной подписки, показываем стандартное приветствие для авторизованного пользователя
-        welcome_text = (
-            f"<b>🚀 ЦЕНТР УПРАВЛЕНИЯ НЕЙРОКОММЕНТИНГОМ</b>\n\n"
-            f"<b>👋 Здравствуйте, {callback.from_user.first_name}!</b>\n\n"
+    welcome_text = (f"<b>🚀 ЦЕНТР УПРАВЛЕНИЯ НЕЙРОКОММЕНТИНГОМ</b>\n\n"
             f"<b>📊 МГНОВЕННЫЙ ДОСТУП К ФУНКЦИЯМ:</b>\n"
             f"• ⚙️ Настройка и редактирование профиля\n"
             f"• 📈 Аналитика эффективности комментирования\n"
@@ -1342,19 +1245,19 @@ async def home_page(callback: CallbackQuery, state: FSMContext):
             f"• 📱 Управление через удобный интерфейс\n\n"
             f"<i>Используйте панель управления ниже для доступа ко всем функциям</i>"
         )
-        await callback.message.edit_text(
+    await callback.message.edit_text(
             welcome_text,
             parse_mode="HTML",
             reply_markup=kb.home_page()
         )
         # Сохраняем ID текущего сообщения и запускаем удаление
-        current_message_id = callback.message.message_id
-        asyncio.create_task(delete_messages_background(
+    current_message_id = callback.message.message_id
+    asyncio.create_task(delete_messages_background(
             callback.bot, 
             callback.message.chat.id, 
             current_message_id
         ))
-        return
+    return
 
     # Если профиль не настроен, показываем стандартное приветствие
     welcome_text = (
