@@ -42,33 +42,11 @@ def main_keyboard_2():
             [InlineKeyboardButton(text="Добавить каналы в список ☑️", callback_data='add_chanels')], #+
             [InlineKeyboardButton(text="Мои каналы для мониторинга📺", callback_data='list_chanel')], #+
             [InlineKeyboardButton(text="Описание профиля 🧑‍💻", callback_data='description_profile')],
-            [InlineKeyboardButton(text="Далее ▶️", callback_data='next')]
+            [InlineKeyboardButton(text='🏠 Главное меню', callback_data='home_page')]
     ])
     return main_keyboard_2
 
-def main_keyboard_3():
-    keyboard = [
-        [
-            InlineKeyboardButton(text="📝 Редактировать описание канала", callback_data="description_chanel"),
-            InlineKeyboardButton(text="👤 Редактировать описание профиля", callback_data="description_profile")
-        ],
-        [
-            InlineKeyboardButton(text="📢 Добавить каналы", callback_data="add_chanels"),
-            InlineKeyboardButton(text="📋 Список каналов", callback_data="list_chanel")
-        ],
-        [
-            InlineKeyboardButton(text="💎 Подписка", callback_data="subscriptions"),
-            InlineKeyboardButton(text="⭐ Отзывы", callback_data="feedback")
-        ],
-        [
-            InlineKeyboardButton(text="🚀 Запустить бота", callback_data="my_bot"),
-            InlineKeyboardButton(text="⚙️ Настройки", callback_data="settings")
-        ],
-        [
-            InlineKeyboardButton(text="🏠 Главное меню", callback_data="home_page")
-        ]
-    ]
-    return InlineKeyboardMarkup(inline_keyboard=keyboard)
+
 
 def start():
     start = InlineKeyboardMarkup(inline_keyboard=[
@@ -272,5 +250,31 @@ def comment_frequency():
         [InlineKeyboardButton(text="Средне", callback_data="freq_medium")],
         [InlineKeyboardButton(text="Редко", callback_data="freq_low")],
         [InlineKeyboardButton(text="Главное меню", callback_data="home_page")]
+    ])
+    return keyboard
+
+def sensitive_content_keyboard():
+    """Клавиатура для отображения после обнаружения сенситивного контента."""
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🔄 Попробовать другой пост", callback_data="test")],
+        [InlineKeyboardButton(text="🏠 Вернуться в главное меню", callback_data="home_page")]
+    ])
+    return keyboard
+
+def subscription_renewal_keyboard():
+    """Клавиатура для продления подписки."""
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="💎 Продлить подписку", callback_data="by_subscriptions")],
+        [InlineKeyboardButton(text="💬 Связаться с поддержкой", url="https://t.me/Alexcharevich")],
+        [InlineKeyboardButton(text="🏠 Главное меню", callback_data="home_page")]
+    ])
+    return keyboard
+
+def launch_bot_test_keyboard():
+    """Клавиатура для запуска бота в тестовом режиме."""
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🔍 Попробовать тестовый режим", callback_data="test")],
+        [InlineKeyboardButton(text="💎 Приобрести подписку", callback_data="by_subscriptions")],
+        [InlineKeyboardButton(text="🏠 Вернуться в меню", callback_data="home_page")]
     ])
     return keyboard

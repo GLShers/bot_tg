@@ -276,3 +276,14 @@ async def update_profile_description(tg_id: int, description: str):
         await session.execute(stmt)
         await session.commit()
         return True  # Подтверждаем успешное обновление
+
+async def reset_to_basic_subscription(tg_id: int):
+    """Сбрасывает подписку пользователя на базовый тариф при истечении срока."""
+    async with async_session() as session:
+        user = await session.scalar(select(User).where(User.tg_id == tg_id))
+        if user:
+            user.sub_id = 1  # Устанавливаем базовую подписку
+            user.date_sub = None  # Сбрасываем дату окончания
+            await session.commit()
+            return True
+        return False
