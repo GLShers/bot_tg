@@ -1636,14 +1636,35 @@ async def handle_launch_bot(callback: CallbackQuery):
             reply_markup=kb.launch_bot_test_keyboard()
         )
     else:
-        # Пользователь с подпиской - направляем на полный режим
-        channels_count = await rq.count_channels_for_user(callback.from_user.id)
-        await callback.message.edit_text(
-            "🏠 <b>Центр управления нейрокомментингом</b>\n\n"
-            "Здесь Вы можете настраивать и оптимизировать все параметры нейрокомментирования для повышения эффективности Вашего канала.",
-            parse_mode="HTML",
-            reply_markup=kb.main_keyboard_2()
-        )
+        # Получаем список каналов пользователя
+        channels = await rq.get_chanels(callback.from_user.id)
+        
+        if not channels:
+            # Если каналов нет, предлагаем добавить их
+            await callback.message.edit_text(
+                "<b>📺 У вас пока нет каналов для мониторинга</b>\n\n"
+                "Для начала работы добавьте каналы, которые хотите мониторить.",
+                parse_mode="HTML",
+                reply_markup=kb.main_keyboard_2()
+            )
+        else:
+            # Формируем список каналов
+            channels_text = "<b>📺 Ваши каналы для мониторинга:</b>\n\n"
+            for i, channel in enumerate(channels, 1):
+                channels_text += f"{i}. {channel}\n"
+            
+            # Создаем клавиатуру
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="🔍 Проверить каналы", callback_data="check_channels")],
+                [InlineKeyboardButton(text="🏠 Главное меню", callback_data="home_page")]
+            ])
+            
+            # Отправляем сообщение с каналами
+            await callback.message.edit_text(
+                channels_text,
+                parse_mode="HTML",
+                reply_markup=keyboard
+            )
 
 # Обработчик кнопки "Остановить бота"
 @router.callback_query(F.data == "stop_bot")
@@ -1676,6 +1697,38 @@ async def handle_stop_bot(callback: CallbackQuery):
         "Для достижения максимальных результатов рекомендуется непрерывная работа системы комментирования не менее 14 дней. Это обеспечивает стабильный рост активности и привлечение новой аудитории.",
         parse_mode="HTML",
         reply_markup=kb.home_page()
+    )
+
+@router.callback_query(F.data == "check_channels")
+async def handle_check_channels(callback: CallbackQuery):
+    # Получаем список каналов пользователя
+    channels = await rq.get_chanels(callback.from_user.id)
+    
+    if not channels:
+        await callback.message.edit_text(
+            "<b>❌ Ошибка</b>\n\n"
+            "Не удалось найти каналы для проверки. Пожалуйста, добавьте каналы в настройках.",
+            parse_mode="HTML",
+            reply_markup=kb.main_keyboard_2()
+        )
+        return
+    
+    # Отправляем сообщение о начале проверки
+    await callback.message.edit_text(
+        "<b>🔍 Начинаем проверку каналов...</b>\n\n"
+        "Пожалуйста, подождите, пока мы проанализируем ваши каналы.",
+        parse_mode="HTML"
+    )
+    
+    # TODO: Здесь будет логика проверки каналов
+    # Пока просто отправляем заглушку
+    await asyncio.sleep(2)  # Имитация проверки
+    
+    await callback.message.edit_text(
+        "<b>✅ Проверка завершена</b>\n\n"
+        "Все каналы доступны и готовы к работе с нейрокомментингом.",
+        parse_mode="HTML",
+        reply_markup=kb.main_keyboard_2()
     )
 
 
