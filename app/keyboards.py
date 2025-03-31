@@ -278,3 +278,22 @@ def launch_bot_test_keyboard():
         [InlineKeyboardButton(text="🏠 Вернуться в меню", callback_data="home_page")]
     ])
     return keyboard
+
+def check_channels_keyboard():
+    """Клавиатура для проверки каналов."""
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🔍 Проверить каналы", callback_data="check_channels")],
+        [InlineKeyboardButton(text="🏠 Главное меню", callback_data="home_page")]
+    ])
+    return keyboard
+
+def main_keyboard_3():
+    """Клавиатура для центра управления после настройки бота."""
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🚀 Запустить бота", callback_data="launch_bot")],
+        [InlineKeyboardButton(text="⏹ Остановить бота", callback_data="stop_bot")],
+        [InlineKeyboardButton(text="📈 Статистика", callback_data="stats")],
+        [InlineKeyboardButton(text="⚙️ Настройки", callback_data="settings")],
+        [InlineKeyboardButton(text="🏠 Главное меню", callback_data="home_page")]
+    ])
+    return keyboard

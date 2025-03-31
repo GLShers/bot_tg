@@ -199,12 +199,9 @@ async def get_bot_data(tg_id):
         
         return bot
 
-async def get_bot_data_for_id(id):
+async def get_bot_data_by_id(bot_id):
     async with async_session() as session:
-        # Преобразуем ID в целое число, если он был передан как строка
-        bot_id = int(id)
-        bot = await session.scalar(select(Bot_data).where(Bot_data.id == bot_id))
-        
+        bot = await session.scalar(select(Bot_data).where(Bot_data.id==bot_id))
         return bot
 
 #---------------------------------------------------------------------------------------- КОМАНДЫ-------------------------------------------------------------------------------------------------
