@@ -343,51 +343,53 @@ async def handle_check_channels(callback: CallbackQuery):
                         })
                         continue
                         
-                    # Проверяем доступность комментариев
-                    full_channel = await client(functions.channels.GetFullChannelRequest(entity))
-                    linked_chat_id = getattr(full_channel.full_chat, 'linked_chat_id', None)
-                    
-                    # Проверяем количество подписчиков
-                    participants_count = getattr(entity, 'participants_count', 0)
-                    
                     status_details = []
+                    can_join = True  # Флаг для отслеживания возможности присоединения
                     
-                    # Проверяем различные параметры
-                    if linked_chat_id:
-                        try:
-                            linked_chat = await client.get_entity(linked_chat_id)
-                            if getattr(linked_chat, 'restricted', False):
-                                status_details.append('⚠️ Группа комментариев закрыта')
-                            else:
-                                status_details.append('✅ Комментарии доступны')
-                        except:
-                            status_details.append('⚠️ Ошибка доступа к группе комментариев')
-                    else:
-                        status_details.append('❌ Нет группы комментариев')
-                    
-                    # Проверяем количество подписчиков с учетом None
-                    if participants_count is None:
-                        status_details.append('⚠️ Не удалось получить количество подписчиков')
-                    elif participants_count < 500:
-                        status_details.append(f'⚠️ Мало подписчиков ({participants_count})')
-                    else:
-                        status_details.append(f'✅ Подписчиков: {participants_count}')
-                    
-                    # Проверяем, не заблокирован ли бот в канале
+                    # Проверяем доступность комментариев
                     try:
-                        await client.send_message(entity, 'test', schedule=datetime.now() + timedelta(days=365))
-                        await client.delete_messages(entity, [message.id for message in await client.get_messages(entity, limit=1)])
-                        status_details.append('✅ Бот не заблокирован')
-                    except Exception as e:
-                        if "CHAT_WRITE_FORBIDDEN" in str(e):
-                            status_details.append('❌ Бот заблокирован в канале')
+                        full_channel = await client(functions.channels.GetFullChannelRequest(entity))
+                        linked_chat_id = getattr(full_channel.full_chat, 'linked_chat_id', None)
+                        
+                        if linked_chat_id:
+                            try:
+                                linked_chat = await client.get_entity(linked_chat_id)
+                                if getattr(linked_chat, 'restricted', False):
+                                    status_details.append('❌ Группа комментариев закрыта')
+                                    can_join = False
+                                else:
+                                    status_details.append('✅ Группа комментариев доступна')
+                            except Exception as e:
+                                status_details.append('❌ Ошибка доступа к группе комментариев')
+                                can_join = False
                         else:
-                            status_details.append('⚠️ Не удалось проверить блокировку')
+                            status_details.append('❌ Нет группы комментариев')
+                            can_join = False
+                            
+                    except Exception as e:
+                        status_details.append('❌ Ошибка проверки канала')
+                        can_join = False
+                    
+                    # Если все проверки пройдены успешно, пробуем присоединиться
+                    if can_join:
+                        try:
+                            # Присоединяемся к каналу
+                            await client(functions.channels.JoinChannelRequest(entity))
+                            status_details.append('✅ Успешно присоединились к каналу')
+                            
+                            # Присоединяемся к группе комментариев
+                            if linked_chat_id:
+                                await client(functions.channels.JoinChannelRequest(linked_chat))
+                                status_details.append('✅ Успешно присоединились к группе комментариев')
+                                
+                        except Exception as e:
+                            status_details.append('❌ Не удалось присоединиться к каналу или группе')
+                            can_join = False
                     
                     results.append({
                         'channel': channel,
                         'title': channel_title,
-                        'status': '✅ Доступен' if all('✅' in detail for detail in status_details) else '⚠️ Есть проблемы',
+                        'status': '✅ Доступен' if can_join else '❌ Недоступен',
                         'details': status_details
                     })
                     
