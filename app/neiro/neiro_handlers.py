@@ -9,7 +9,8 @@ import app.database.requests as rq
 from concurrent.futures import ThreadPoolExecutor
 import random
 import logging
-import logging
+from datetime import datetime, timedelta
+
 executor = ThreadPoolExecutor()
 nero_router = Router()
 client = None  # Глобальный клиент
@@ -74,7 +75,7 @@ async def find_channels_with_comments(client, query):
                 comments_available = await has_comments(client, user_or_channel)
 
                 # Проверяем, что канал подходит по всем критериям
-                if participants_count >= 5000 and invite_link and comments_available:
+                if participants_count >= 500 and invite_link and comments_available:
                     # Проверяем, содержится ли ключевое слово в названии или описании
                     if query.lower() in title.lower():
                         channels_info.append(invite_link)  # Сохраняем только ссылку
@@ -216,7 +217,7 @@ async def run_bot(callback: CallbackQuery):
 
             # Сразу уведомляем пользователя о новом посте
             await callback.message.answer(
-                f"📩 <b>Новый пост в канале:</b> {chat_title}\n"
+                f" <b>Новый пост в канале:</b> {chat_title}\n"
                 f"🔗 <b>Ссылка на пост:</b> {post_url}\n"
                 f"💬 <b>Комментарий оставлен</b>",  # <-- Закрываем тег <b>
                 parse_mode="HTML"
@@ -278,6 +279,174 @@ async def stop_bot(message: Message):
         await message.answer("⛔ Бот успешно остановлен!", reply_markup=kb.main_button())
     else:
         await message.answer("⚠️ Бот уже остановлен или не был запущен.", reply_markup=kb.main_button())
+
+@nero_router.callback_query(F.data == "check_channels")
+async def handle_check_channels(callback: CallbackQuery):
+    user_id = callback.from_user.id
+    
+    # Получаем данные пользователя и бота
+    user = await rq.get_user_data(user_id)
+    bot = await rq.get_bot_data(user_id)
+    
+    if not user or not bot:
+        await callback.message.edit_text(
+            "⚠️ Ошибка: не удалось получить данные пользователя или бота",
+            reply_markup=kb.main_button()
+        )
+        return
+        
+    channels = await rq.get_chanels(user_id)
+    if not channels:
+        await callback.message.edit_text(
+            "📝 У вас пока нет добавленных каналов для мониторинга",
+            reply_markup=kb.main_button()
+        )
+        return
+        
+    # Отправляем начальное сообщение
+    status_message = await callback.message.edit_text(
+        "🔍 Начинаю проверку каналов...\n"
+        "⏳ Пожалуйста, подождите..."
+    )
+    
+    try:
+        # Создаем клиент с данными из БД
+        async with TelegramClient(
+            f"sessions/session_{bot.id}_{bot.link_bot}",
+            bot.api_id,
+            bot.hash_id
+        ) as client:
+            
+            results = []
+            total = len(channels)
+            checked = 0
+            
+            for channel in channels:
+                checked += 1
+                try:
+                    # Обновляем статус проверки
+                    await status_message.edit_text(
+                        f"🔍 Проверка каналов...\n"
+                        f"✓ Проверено: {checked}/{total}\n"
+                        f"📊 Текущий канал: {channel}"
+                    )
+                    
+                    # Проверяем существование канала
+                    try:
+                        entity = await client.get_entity(channel)
+                        channel_title = getattr(entity, 'title', 'Без названия')
+                    except ValueError:
+                        results.append({
+                            'channel': channel,
+                            'status': '❌ Канал не найден',
+                            'details': 'Возможно канал удален или ссылка неверна'
+                        })
+                        continue
+                        
+                    # Проверяем доступность комментариев
+                    full_channel = await client(functions.channels.GetFullChannelRequest(entity))
+                    linked_chat_id = getattr(full_channel.full_chat, 'linked_chat_id', None)
+                    
+                    # Проверяем количество подписчиков
+                    participants_count = getattr(entity, 'participants_count', 0)
+                    
+                    status_details = []
+                    
+                    # Проверяем различные параметры
+                    if linked_chat_id:
+                        try:
+                            linked_chat = await client.get_entity(linked_chat_id)
+                            if getattr(linked_chat, 'restricted', False):
+                                status_details.append('⚠️ Группа комментариев закрыта')
+                            else:
+                                status_details.append('✅ Комментарии доступны')
+                        except:
+                            status_details.append('⚠️ Ошибка доступа к группе комментариев')
+                    else:
+                        status_details.append('❌ Нет группы комментариев')
+                    
+                    # Проверяем количество подписчиков с учетом None
+                    if participants_count is None:
+                        status_details.append('⚠️ Не удалось получить количество подписчиков')
+                    elif participants_count < 500:
+                        status_details.append(f'⚠️ Мало подписчиков ({participants_count})')
+                    else:
+                        status_details.append(f'✅ Подписчиков: {participants_count}')
+                    
+                    # Проверяем, не заблокирован ли бот в канале
+                    try:
+                        await client.send_message(entity, 'test', schedule=datetime.now() + timedelta(days=365))
+                        await client.delete_messages(entity, [message.id for message in await client.get_messages(entity, limit=1)])
+                        status_details.append('✅ Бот не заблокирован')
+                    except Exception as e:
+                        if "CHAT_WRITE_FORBIDDEN" in str(e):
+                            status_details.append('❌ Бот заблокирован в канале')
+                        else:
+                            status_details.append('⚠️ Не удалось проверить блокировку')
+                    
+                    results.append({
+                        'channel': channel,
+                        'title': channel_title,
+                        'status': '✅ Доступен' if all('✅' in detail for detail in status_details) else '⚠️ Есть проблемы',
+                        'details': status_details
+                    })
+                    
+                except Exception as e:
+                    results.append({
+                        'channel': channel,
+                        'status': '❌ Ошибка проверки',
+                        'details': str(e)
+                    })
+            
+            # Формируем красивый вывод результатов
+            output = "*📊 Результаты проверки каналов:*\n\n"
+            
+            for i, result in enumerate(results, 1):
+                output += f"*{i}. {result['channel']}*\n"
+                if 'title' in result:
+                    output += f"📢 Название: {result['title']}\n"
+                output += f"📌 Статус: {result['status']}\n"
+                
+                if isinstance(result['details'], list):
+                    output += "📋 Детали:\n"
+                    for detail in result['details']:
+                        output += f"   • {detail}\n"
+                else:
+                    output += f"📋 Детали: {result['details']}\n"
+                output += "\n"
+            
+            # Добавляем общую статистику
+            total_ok = sum(1 for r in results if '✅' in r['status'])
+            total_warn = sum(1 for r in results if '⚠️' in r['status'])
+            total_error = sum(1 for r in results if '❌' in r['status'])
+            
+            output += f"\n*📈 Общая статистика:*\n"
+            output += f"✅ Полностью доступны: {total_ok}\n"
+            output += f"⚠️ Есть проблемы: {total_warn}\n"
+            output += f"❌ Недоступны: {total_error}\n"
+            
+            # Разбиваем сообщение на части, если оно слишком длинное
+            max_length = 4096
+            messages = [output[i:i+max_length] for i in range(0, len(output), max_length)]
+            
+            for i, message_part in enumerate(messages):
+                if i == 0:
+                    await status_message.edit_text(
+                        message_part,
+                        parse_mode="Markdown",
+                        reply_markup=kb.main_button()
+                    )
+                else:
+                    await callback.message.answer(
+                        message_part,
+                        parse_mode="Markdown"
+                    )
+                    
+    except Exception as e:
+        await status_message.edit_text(
+            f"❌ Произошла ошибка при проверке каналов:\n{str(e)}",
+            reply_markup=kb.main_button()
+        )
 
 
 

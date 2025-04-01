@@ -1095,7 +1095,7 @@ async def process_new_link(message: Message, state: FSMContext):
     # Обновляем в БД
     await rq.update_channel(message.from_user.id, old_link, new_link)
 
-    await message.answer(f"Канал обновлён: {old_link} → {new_link}")
+    await message.answer(f"Канал обновлён: {old_link} → {new_link}", reply_markup=kb.main_button())
     await state.clear()  # Очищаем состояние
 
 
@@ -1694,52 +1694,4 @@ async def handle_stop_bot(callback: CallbackQuery):
         parse_mode="HTML",
         reply_markup=kb.home_page()
     )
-
-@router.callback_query(F.data == "check_channels")
-async def handle_check_channels(callback: CallbackQuery):
-    # Получаем список каналов пользователя
-    channels = await rq.get_chanels(callback.from_user.id)
-    
-    if not channels:
-        await callback.message.edit_text(
-            "У вас пока нет каналов для проверки.",
-            reply_markup=kb.main_keyboard_2()
-        )
-        return
-        
-    # Отправляем сообщение о начале проверки
-    await callback.message.edit_text(
-        "🔍 Начинаю проверку каналов...\n"
-        "Это может занять некоторое время.",
-        reply_markup=None
-    )
-    
-    # Проверяем каналы
-    results = await check_channels(callback.from_user.id, channels)
-    
-    # Формируем сообщение с результатами
-    message_text = "<b>📊 Результаты проверки каналов:</b>\n\n"
-    
-    success_count = 0
-    for channel, (success, message) in results.items():
-        if success:
-            success_count += 1
-            message_text += f"✅ {channel}\n"
-        else:
-            message_text += f"❌ {channel}\n"
-            message_text += f"   Причина: {message}\n"
-    
-    message_text += f"\n<b>📈 Итого:</b>\n"
-    message_text += f"✅ Успешно: {success_count}\n"
-    message_text += f"❌ Неудачно: {len(channels) - success_count}"
-    
-    # Отправляем результаты
-    await callback.message.edit_text(
-        message_text,
-        parse_mode="HTML",
-        reply_markup=kb.main_keyboard_2()
-    )
-
-
-
 
